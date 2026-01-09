@@ -17,6 +17,8 @@ public class MyHeadTrackingCarMod : Mod
     public override string Description => "Adds the TrackIR SDK";
     //public override byte[] Icon => Properties.Resources.icon;
 
+    public override Game SupportedGames => Game.MySummerCar_And_MyWinterCar;
+
     #endregion
 
     #region ModLoader Hooks
