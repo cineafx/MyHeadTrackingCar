@@ -27,6 +27,7 @@ public class MouseLookWithModifiers : MonoBehaviour
     public bool OriginalMouseLookEnabled => _sourceMouseLook.enabled;
 
     public Vector3 additionalRotation = Vector3.zero;
+    public bool blockMouseTilt = false;
 
     private void Update()
     {
@@ -46,7 +47,10 @@ public class MouseLookWithModifiers : MonoBehaviour
         }
         else
         {
-            rotationY += Input.GetAxis("Mouse Y") * _sourceMouseLook.sensitivityY;
+            if (blockMouseTilt)
+                rotationY = 0.0f;
+            else 
+                rotationY += Input.GetAxis("Mouse Y") * _sourceMouseLook.sensitivityY;
             rotationY = Mathf.Clamp(rotationY, _sourceMouseLook.minimumY, _sourceMouseLook.maximumY);
             transform.localEulerAngles = new Vector3(-rotationY, 0.0f, 0.0f) +
                                               additionalRotation;
