@@ -2,15 +2,15 @@
 
 **Warning:** this mod is still a work in progress.
 
-This mod enables TrackIR usage in My Summer Car (and hopefully soon My Winter Car).
+This mod enables TrackIR usage in My Summer Car and My Winter Car.
 
 ## Installation
 
 Requires MSCLoader by piotrulos:
 
-- [GitHub](https://github.com/piotrulos/MSCModLoader/tree/master)
-- [Nexus MSC](https://www.nexusmods.com/mysummercar/mods/147)
-- [Nexus MWC](https://www.nexusmods.com/mywintercar/mods/3)
+- [GitHub: MSCLoader](https://github.com/piotrulos/MSCModLoader/tree/master)
+- [Nexus Mods: My Summer Car](https://www.nexusmods.com/mysummercar/mods/147)
+- [Nexus Mods: My Winter Car](https://www.nexusmods.com/mywintercar/mods/3)
 
 Simply put the `MyHeadtrackingCar.dll` into the `Mods` folder.
 
