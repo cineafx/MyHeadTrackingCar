@@ -27,7 +27,8 @@ GPL-2.0 license and modifed for use in this mod.
 
 This mod is therefore also distributed under the **GPL-2.0 license**.
 You may use, modify, and share it under the same license.  
-See the included `LICENSE` file for details.
+See the included `LICENSE` file for details. 
+Source code is available on [GitHub](https://github.com/cineafx/MyHeadTrackingCar).
 
 ## **Disclaimer**
 
