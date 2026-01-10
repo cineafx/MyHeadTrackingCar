@@ -75,7 +75,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MouseLookWithModifiers.cs"/>
-    <Compile Include="MyHeadTrackingCarSettings.cs" />
+    <Compile Include="MyHeadTrackingCarSettings.cs"/>
     <Compile Include="Properties\AssemblyInfo.cs"/>
     <Compile Include="TrackIRFromKerbTrack\TrackIRClient.cs"/>
     <Compile Include="TrackIRFromKerbTrack\TrackIRTracker.cs"/>
@@ -93,5 +93,26 @@
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModsDir)" SkipUnchangedFiles="true"/>
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ModsDir)" SkipUnchangedFiles="true"/>
     <Exec Command="&quot;$(ModsDir)\debug.bat&quot;" WorkingDirectory="$(ModsDir)"/>
+  </Target>
+  <Target Name="Publish"
+          AfterTargets="Build"
+          Condition=" '$(Configuration)' == 'Release' ">
+    <!-- Delete old publish zips -->
+    <ItemGroup>
+      <ZipsToDelete Include="$(OutputPath)MyHeadTrackingCar-*.zip"/>
+    </ItemGroup>
+    <Delete Files="@(ZipsToDelete)" ContinueOnError="true"/>
+    <!-- Create name for new zip -->
+    <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">
+      <Output TaskParameter="Assemblies" ItemName="BuiltAssembly"/>
+    </GetAssemblyIdentity>
+    <PropertyGroup>
+      <AssemblyVersion>%(BuiltAssembly.Version)</AssemblyVersion>
+      <ZipFileName>$(OutputPath)MyHeadTrackingCar-$(AssemblyVersion).zip</ZipFileName>
+    </PropertyGroup>
+    <!-- Build zip with powershell because Zip is not yet present in this version of MSBuilt-->
+    <Exec Command="powershell -NoProfile -Command Compress-Archive -Path '$(TargetPath)','$(SolutionDir)README.md','$(SolutionDir)LICENSE' -DestinationPath '$(ZipFileName)' -Force"
+          IgnoreExitCode="true"
+          ConsoleToMsBuild="true"/>
   </Target>
 </Project>
