@@ -1,25 +1,37 @@
-﻿using Microsoft.Win32;
-using System;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
-namespace TrackIRUnity;
+namespace MyHeadTrackingCar.TrackIRFromKerbTrack;
 
+/// <summary>
+/// Taken from <a href="https://github.com/FirstPersonKSP/KerbTrack/blob/c5850ffee11600cc54b305902175144ec0c5a820/KerbTrack/TrackIRClient.cs" >FirstPersonKSP KerbTrack</a>
+/// under GPL-2.0 license.<br/>
+/// Fixed missing TrackIR NPClient DLL registry NullRef error,
+/// adjusted namespace, changed result handling and implemented style / formatting changes.
+/// Expanded RequestData and program ID result logging output.<br/>
+/// Functionality stays pretty much the same.
+/// </summary>
+[SuppressMessage("ReSharper", "InconsistentNaming")]
+[SuppressMessage("ReSharper", "UnusedMember.Global")]
 public class TrackIRClient
 {
-    private TrackIRClient.dNP_GetSignatureDelegate NP_GetSignatureDelegate;
-    private TrackIRClient.dNP_RegisterWindowHandle NP_RegisterWindowHandle;
-    private TrackIRClient.dNP_UnregisterWindowHandle NP_UnregisterWindowHandle;
-    private TrackIRClient.dNP_RegisterProgramProfileID NP_RegisterProgramProfileID;
-    private TrackIRClient.dNP_QueryVersion NP_QueryVersion;
-    private TrackIRClient.dNP_RequestData NP_RequestData;
-    private TrackIRClient.dNP_GetData NP_GetData;
+    private dNP_GetSignatureDelegate NP_GetSignatureDelegate;
+    private dNP_RegisterWindowHandle NP_RegisterWindowHandle;
+    private dNP_UnregisterWindowHandle NP_UnregisterWindowHandle;
+    private dNP_RegisterProgramProfileID NP_RegisterProgramProfileID;
+    private dNP_QueryVersion NP_QueryVersion;
+    private dNP_RequestData NP_RequestData;
+    private dNP_GetData NP_GetData;
     //private TrackIRClient.dNP_UnregisterNotify NP_UnregisterNotify;
-    private TrackIRClient.dNP_StartCursor NP_StartCursor;
-    private TrackIRClient.dNP_StopCursor NP_StopCursor;
-    private TrackIRClient.dNP_ReCenter NP_ReCenter;
-    private TrackIRClient.dNP_StartDataTransmission NP_StartDataTransmission;
-    private TrackIRClient.dNP_StopDataTransmission NP_StopDataTransmission;
+    private dNP_StartCursor NP_StartCursor;
+    private dNP_StopCursor NP_StopCursor;
+    private dNP_ReCenter NP_ReCenter;
+    private dNP_StartDataTransmission NP_StartDataTransmission;
+    private dNP_StopDataTransmission NP_StopDataTransmission;
     private ulong NPFrameSignature;
     internal ulong NPStaleFrames;
 
@@ -35,92 +47,125 @@ public class TrackIRClient
     [DllImport("kernel32.dll")]
     private static extern bool FreeLibrary(int hModule);
 
-    public string TrackIR_Enhanced_Init()
+    public List<string> TrackIR_Enhanced_Init()
     {
-        this.NPFrameSignature = 0UL;
-        this.NPStaleFrames = 0UL;
+        NPFrameSignature = 0UL;
+        NPStaleFrames = 0UL;
         string dllPath = "";
-        string result = "";
-        this.GetDLLLocation(ref dllPath);
-        int NPResult = (int)this.NPClient_Init(dllPath);
-        if (this.NPClient_Init(dllPath) == TrackIRClient.NPRESULT.NP_OK)
+        List<string> result = [];
+        
+        /* ----- Get TrackIR NPClient DLL location ----- */
+        GetDLLLocation(ref dllPath);
+        if (string.IsNullOrEmpty(dllPath))
         {
-            result += "NPClient interface -- initialize OK\r\n";
-            int foregroundWindow = TrackIRClient.GetForegroundWindow();
-            result += "ForegroundWindow handle: " + foregroundWindow.ToString() + "\r\n";
-            if (this.NP_RegisterWindowHandle(foregroundWindow) == TrackIRClient.NPRESULT.NP_OK)
-            {
-                result += "NPClient : Window handle registration successful.\r\n";
-                ushort pwVersion = (ushort)0;
-                if (this.NP_QueryVersion(ref pwVersion) == TrackIRClient.NPRESULT.NP_OK)
-                {
-                    result += string.Format("NaturalPoint software version is " + string.Format("{0:d}",
-                        (object)((int)pwVersion >> 8)) + "." + ((object)string.Format("{0:d}",
-                        (object)((int)pwVersion & (int)byte.MaxValue))).ToString() + "\r\n");
-                    int num2 = (int)this.NP_RequestData((ushort)((uint)(0 | 2) | 4U | 1U | 16U | 32U | 64U));
-                    int num3 = (int)this.NP_RegisterProgramProfileID((ushort)20430);
-                    if (this.NP_StopCursor() == TrackIRClient.NPRESULT.NP_OK)
-                    {
-                        result += "Cursor stopped\r\n";
-                        if (this.NP_StartDataTransmission() == TrackIRClient.NPRESULT.NP_OK)
-                            return result + "Data Transmission started\r\n";
-                        result += "NPCLient : Error starting data transmission\r\n";
-                        return result;
-                    }
-                    else
-                    {
-                        result += "NPClient : Error stopping cursor\r\n";
-                        return result;
-                    }
-                }
-                else
-                {
-                    result += "NPClient : Error querying NaturalPoint software version!!\r\n";
-                    return result;
-                }
-            }
-            else
-            {
-                result += "NPClient : Error registering window handle!!\r\n";
-                return result;
-            }
-        }
-        else
-        {
-            result = result + "Error initializing NPClient interface!!\r\n";
+            result.Add("TrackIR NPClient DLL not found. TrackIR software might not be installed.");
             return result;
         }
+        /* ----- Init client ----- */
+        //int NPResult = (int)NPClient_Init(dllPath); // TODO: figure out why this was here twice
+        if (NPClient_Init(dllPath) != NPRESULT.NP_OK)
+        {
+            result.Add("Error initializing NPClient interface!!");
+            return result;
+        }
+
+        result.Add("NPClient : interface -- initialize OK");
+        
+        /* ----- Register window handle ----- */
+        int foregroundWindow = GetForegroundWindow();
+        result.Add($"NPClient : ForegroundWindow handle: {foregroundWindow}");
+        if (NP_RegisterWindowHandle(foregroundWindow) != NPRESULT.NP_OK)
+        {
+            result.Add("NPClient : Error registering window handle!!");
+            return result;
+        }
+
+        result.Add("NPClient : Window handle registration successful.");
+        
+        /* ----- Query software version ----- */
+        ushort pwVersion = (ushort)0;
+        if (NP_QueryVersion(ref pwVersion) != NPRESULT.NP_OK)
+        {
+            result.Add("NPClient : Error querying NaturalPoint software version!!");
+            return result;
+        }
+
+        int majorVersion = pwVersion >> 8;
+        int minorVersion = pwVersion & 0xFF;
+        result.Add($"NPClient : NaturalPoint software version is {majorVersion}.{minorVersion}");
+        
+        /* ----- Set requested data fields ----- */
+        // Roll  =  1
+        // Pitch =  2
+        // Yaw   =  4
+        // X     = 16
+        // Y     = 32
+        // Z     = 64
+        if (NP_RequestData((ushort)(1U | 2U | 4U | 16U | 32U | 64U)) != NPRESULT.NP_OK)
+        {
+            result.Add("NPClient : Error setting RequestData values!!");
+            return result;
+        }
+        result.Add("NPClient : RequestData values configured.");
+        
+        /* ----- Register program ID ----- */
+        // 20430 is the "Unity 3d plugin" one
+        if (NP_RegisterProgramProfileID((ushort)20430) != NPRESULT.NP_OK)
+        {
+            result.Add("NPClient : Error registering program profile ID!!");
+            return result;
+        }
+        result.Add("NPClient : Program profile ID registered.");
+        
+        /* ----- Stop cursor (mouse cursor control with TrackIR) ----- */
+        if (NP_StopCursor() != NPRESULT.NP_OK)
+        {
+            result.Add("NPClient : Error stopping cursor");
+            return result;
+        }
+
+        result.Add("NPClient : Cursor stopped");
+        
+        /* ----- Start data transmission ----- */
+        if (NP_StartDataTransmission() != NPRESULT.NP_OK)
+        {
+            result.Add("NPClient : Error starting data transmission");
+            return result;
+        }
+
+        result.Add("NPClient : Data Transmission started");
+        return result;
     }
 
-    public TrackIRClient.LPTRACKIRDATA client_HandleTrackIRData()
+    public LPTRACKIRDATA client_HandleTrackIRData()
     {
-        TrackIRClient.LPTRACKIRDATA pTID = new TrackIRClient.LPTRACKIRDATA();
-        if (this.NP_GetData(ref pTID) != TrackIRClient.NPRESULT.NP_OK || (int)pTID.wNPStatus != (int)NPSTATUS.NPSTATUS_REMOTEACTIVE)
+        LPTRACKIRDATA pTID = new LPTRACKIRDATA();
+        if (NP_GetData(ref pTID) != NPRESULT.NP_OK || (int)pTID.wNPStatus != (int)NPSTATUS.NPSTATUS_REMOTEACTIVE)
             return pTID;
-        if ((long)this.NPFrameSignature != (long)pTID.wPFrameSignature)
+        if ((long)NPFrameSignature != (long)pTID.wPFrameSignature)
         {
-            this.NPFrameSignature = (ulong)pTID.wPFrameSignature;
-            this.NPStaleFrames = 0UL;
+            NPFrameSignature = (ulong)pTID.wPFrameSignature;
+            NPStaleFrames = 0UL;
             return pTID;
         }
         else
         {
-            if (this.NPStaleFrames > 30UL)
+            if (NPStaleFrames > 30UL)
                 return pTID;
-            ++this.NPStaleFrames;
+            ++NPStaleFrames;
             return pTID;
         }
     }
 
     public string client_TestTrackIRData()
     {
-        TrackIRClient.LPTRACKIRDATA pTID = new TrackIRClient.LPTRACKIRDATA();
+        LPTRACKIRDATA pTID = new LPTRACKIRDATA();
         string result = "";
-        if (this.NP_GetData(ref pTID) == TrackIRClient.NPRESULT.NP_OK)
+        if (NP_GetData(ref pTID) == NPRESULT.NP_OK)
         {
             if ((int)pTID.wNPStatus == (int)NPSTATUS.NPSTATUS_REMOTEACTIVE)
             {
-                if ((long)this.NPFrameSignature != (long)pTID.wPFrameSignature)
+                if ((long)NPFrameSignature != (long)pTID.wPFrameSignature)
                 {
                     result = result + "Pitch: " + pTID.fNPPitch + "\r\n" +
                              "Roll: " + pTID.fNPRoll + "\r\n" +
@@ -128,18 +173,18 @@ public class TrackIRClient
                              "PosX: " + pTID.fNPX + "\r\n" +
                              "PosY: " + pTID.fNPY + "\r\n" +
                              "PosZ: " + pTID.fNPX + "\r\n";
-                    this.NPFrameSignature = (ulong)pTID.wPFrameSignature;
-                    this.NPStaleFrames = 0UL;
+                    NPFrameSignature = (ulong)pTID.wPFrameSignature;
+                    NPStaleFrames = 0UL;
                 }
-                else if (this.NPStaleFrames > 30UL)
+                else if (NPStaleFrames > 30UL)
                 {
                     result += "No New Data. Paused or Not Tracking?\r\n" +
                               "Information NPStatus = " + pTID.wNPStatus + "\r\n";
                 }
                 else
                 {
-                    ++this.NPStaleFrames;
-                    result += "No New Data for " + this.NPStaleFrames + " frames\r\n" +
+                    ++NPStaleFrames;
+                    result += "No New Data for " + NPStaleFrames + " frames\r\n" +
                               "Information NPStatus = " + pTID.wNPStatus + "\r\n";
                 }
             }
@@ -152,13 +197,13 @@ public class TrackIRClient
     public string TrackIR_Shutdown()
     {
         string result = "";
-        result += this.NP_StopDataTransmission() != TrackIRClient.NPRESULT.NP_OK ? "StopDataTransmission() ERROR!!\r\n" : "StopDataTransmission() OK\r\n";
-        result += this.NP_StartCursor() != TrackIRClient.NPRESULT.NP_OK ? "StartCursor() ERROR!!\r\n" : "StartCursor() OK\r\n";
-        result += this.NP_UnregisterWindowHandle() != TrackIRClient.NPRESULT.NP_OK ? "UnregisterWindowHandle() ERROR!!\r\n" : "UnregisterWindowHandle() OK\r\n";
+        result += NP_StopDataTransmission() != NPRESULT.NP_OK ? "StopDataTransmission() ERROR!!\r\n" : "StopDataTransmission() OK\r\n";
+        result += NP_StartCursor() != NPRESULT.NP_OK ? "StartCursor() ERROR!!\r\n" : "StartCursor() OK\r\n";
+        result += NP_UnregisterWindowHandle() != NPRESULT.NP_OK ? "UnregisterWindowHandle() ERROR!!\r\n" : "UnregisterWindowHandle() OK\r\n";
         return result;
     }
 
-    public TrackIRClient.NPRESULT NPClient_Init(string dllPath)
+    public NPRESULT NPClient_Init(string dllPath)
     {
         //LET THE SORCERY COMMENCE
         if (IntPtr.Size == 4) //32 bit
@@ -170,77 +215,79 @@ public class TrackIRClient
             dllPath = dllPath + "NPClient64.dll";
         }
         if (!File.Exists(dllPath))
-            return TrackIRClient.NPRESULT.NP_ERR_DLL_NOT_FOUND;
-        int hModule = TrackIRClient.LoadLibrary(dllPath);
+            return NPRESULT.NP_ERR_DLL_NOT_FOUND;
+        int hModule = LoadLibrary(dllPath);
         if (hModule == 0)
-            return TrackIRClient.NPRESULT.NP_ERR_DLL_NOT_FOUND;
-        this.NP_GetSignatureDelegate = (TrackIRClient.dNP_GetSignatureDelegate)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_GetSignature"), typeof(TrackIRClient.dNP_GetSignatureDelegate));
-        TrackIRClient.LPTRACKIRSIGNATUREDATA signature = new TrackIRClient.LPTRACKIRSIGNATUREDATA();
-        TrackIRClient.LPTRACKIRSIGNATUREDATA lptrackirsignaturedata = new TrackIRClient.LPTRACKIRSIGNATUREDATA();
+            return NPRESULT.NP_ERR_DLL_NOT_FOUND;
+        NP_GetSignatureDelegate = (dNP_GetSignatureDelegate)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_GetSignature"), typeof(dNP_GetSignatureDelegate));
+        LPTRACKIRSIGNATUREDATA signature = new LPTRACKIRSIGNATUREDATA();
+        LPTRACKIRSIGNATUREDATA lptrackirsignaturedata = new LPTRACKIRSIGNATUREDATA();
         lptrackirsignaturedata.DllSignature = "precise head tracking\n put your head into the game\n now go look around\n\n Copyright EyeControl Technologies";
         lptrackirsignaturedata.AppSignature = "hardware camera\n software processing data\n track user movement\n\n Copyright EyeControl Technologies";
-        TrackIRClient.NPRESULT npresult;
-        if (this.NP_GetSignatureDelegate(ref signature) == TrackIRClient.NPRESULT.NP_OK)
+        NPRESULT npresult;
+        if (NP_GetSignatureDelegate(ref signature) == NPRESULT.NP_OK)
         {
             if (string.Compare(lptrackirsignaturedata.DllSignature, signature.DllSignature) == 0 && string.Compare(lptrackirsignaturedata.AppSignature, signature.AppSignature) == 0)
             {
-                npresult = TrackIRClient.NPRESULT.NP_OK;
-                this.NP_RegisterWindowHandle = (TrackIRClient.dNP_RegisterWindowHandle)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_RegisterWindowHandle"), typeof(TrackIRClient.dNP_RegisterWindowHandle));
-                this.NP_UnregisterWindowHandle = (TrackIRClient.dNP_UnregisterWindowHandle)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_UnregisterWindowHandle"), typeof(TrackIRClient.dNP_UnregisterWindowHandle));
-                this.NP_RegisterProgramProfileID = (TrackIRClient.dNP_RegisterProgramProfileID)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_RegisterProgramProfileID"), typeof(TrackIRClient.dNP_RegisterProgramProfileID));
-                this.NP_QueryVersion = (TrackIRClient.dNP_QueryVersion)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_QueryVersion"), typeof(TrackIRClient.dNP_QueryVersion));
-                this.NP_RequestData = (TrackIRClient.dNP_RequestData)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_RequestData"), typeof(TrackIRClient.dNP_RequestData));
-                this.NP_GetData = (TrackIRClient.dNP_GetData)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_GetData"), typeof(TrackIRClient.dNP_GetData));
-                this.NP_StartCursor = (TrackIRClient.dNP_StartCursor)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_StartCursor"), typeof(TrackIRClient.dNP_StartCursor));
-                this.NP_StopCursor = (TrackIRClient.dNP_StopCursor)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_StopCursor"), typeof(TrackIRClient.dNP_StopCursor));
-                this.NP_ReCenter = (TrackIRClient.dNP_ReCenter)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_ReCenter"), typeof(TrackIRClient.dNP_ReCenter));
-                this.NP_StartDataTransmission = (TrackIRClient.dNP_StartDataTransmission)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_StartDataTransmission"), typeof(TrackIRClient.dNP_StartDataTransmission));
-                this.NP_StopDataTransmission = (TrackIRClient.dNP_StopDataTransmission)Marshal.GetDelegateForFunctionPointer(TrackIRClient.GetProcAddress(hModule, "NP_StopDataTransmission"), typeof(TrackIRClient.dNP_StopDataTransmission));
+                npresult = NPRESULT.NP_OK;
+                NP_RegisterWindowHandle = (dNP_RegisterWindowHandle)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_RegisterWindowHandle"), typeof(dNP_RegisterWindowHandle));
+                NP_UnregisterWindowHandle = (dNP_UnregisterWindowHandle)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_UnregisterWindowHandle"), typeof(dNP_UnregisterWindowHandle));
+                NP_RegisterProgramProfileID = (dNP_RegisterProgramProfileID)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_RegisterProgramProfileID"), typeof(dNP_RegisterProgramProfileID));
+                NP_QueryVersion = (dNP_QueryVersion)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_QueryVersion"), typeof(dNP_QueryVersion));
+                NP_RequestData = (dNP_RequestData)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_RequestData"), typeof(dNP_RequestData));
+                NP_GetData = (dNP_GetData)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_GetData"), typeof(dNP_GetData));
+                NP_StartCursor = (dNP_StartCursor)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_StartCursor"), typeof(dNP_StartCursor));
+                NP_StopCursor = (dNP_StopCursor)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_StopCursor"), typeof(dNP_StopCursor));
+                NP_ReCenter = (dNP_ReCenter)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_ReCenter"), typeof(dNP_ReCenter));
+                NP_StartDataTransmission = (dNP_StartDataTransmission)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_StartDataTransmission"), typeof(dNP_StartDataTransmission));
+                NP_StopDataTransmission = (dNP_StopDataTransmission)Marshal.GetDelegateForFunctionPointer(GetProcAddress(hModule, "NP_StopDataTransmission"), typeof(dNP_StopDataTransmission));
             }
             else
-                npresult = TrackIRClient.NPRESULT.NP_ERR_DLL_NOT_FOUND;
+                npresult = NPRESULT.NP_ERR_DLL_NOT_FOUND;
         }
         else
-            npresult = TrackIRClient.NPRESULT.NP_ERR_DLL_NOT_FOUND;
+            npresult = NPRESULT.NP_ERR_DLL_NOT_FOUND;
         return npresult;
     }
 
     public void GetDLLLocation(ref string dllPath)
     {
         RegistryKey registryKey = Registry.CurrentUser.OpenSubKey("Software\\NaturalPoint\\NATURALPOINT\\NPClient Location", false);
+        if (registryKey == null)
+            return;
         dllPath = registryKey.GetValue("Path").ToString();
         registryKey.Close();
     }
 
-    private delegate TrackIRClient.NPRESULT PF_NOTIFYCALLBACK(ushort a, ushort b);
+    private delegate NPRESULT PF_NOTIFYCALLBACK(ushort a, ushort b);
 
-    private delegate TrackIRClient.NPRESULT dNP_GetSignatureDelegate(ref TrackIRClient.LPTRACKIRSIGNATUREDATA signature);
+    private delegate NPRESULT dNP_GetSignatureDelegate(ref LPTRACKIRSIGNATUREDATA signature);
 
-    private delegate TrackIRClient.NPRESULT dNP_RegisterWindowHandle(int hWnd);
+    private delegate NPRESULT dNP_RegisterWindowHandle(int hWnd);
 
-    private delegate TrackIRClient.NPRESULT dNP_RegisterProgramProfileID(ushort wPPID);
+    private delegate NPRESULT dNP_RegisterProgramProfileID(ushort wPPID);
 
-    private delegate TrackIRClient.NPRESULT dNP_UnregisterWindowHandle();
+    private delegate NPRESULT dNP_UnregisterWindowHandle();
 
-    private delegate TrackIRClient.NPRESULT dNP_QueryVersion(ref ushort pwVersion);
+    private delegate NPRESULT dNP_QueryVersion(ref ushort pwVersion);
 
-    private delegate TrackIRClient.NPRESULT dNP_RequestData(ushort wDataReq);
+    private delegate NPRESULT dNP_RequestData(ushort wDataReq);
 
-    private delegate TrackIRClient.NPRESULT dNP_GetData(ref TrackIRClient.LPTRACKIRDATA pTID);
+    private delegate NPRESULT dNP_GetData(ref LPTRACKIRDATA pTID);
 
-    private delegate TrackIRClient.NPRESULT dNP_RegisterNotify(TrackIRClient.PF_NOTIFYCALLBACK pfNotify);
+    private delegate NPRESULT dNP_RegisterNotify(PF_NOTIFYCALLBACK pfNotify);
 
-    private delegate TrackIRClient.NPRESULT dNP_UnregisterNotify();
+    private delegate NPRESULT dNP_UnregisterNotify();
 
-    private delegate TrackIRClient.NPRESULT dNP_StartCursor();
+    private delegate NPRESULT dNP_StartCursor();
 
-    private delegate TrackIRClient.NPRESULT dNP_StopCursor();
+    private delegate NPRESULT dNP_StopCursor();
 
-    private delegate TrackIRClient.NPRESULT dNP_ReCenter();
+    private delegate NPRESULT dNP_ReCenter();
 
-    private delegate TrackIRClient.NPRESULT dNP_StartDataTransmission();
+    private delegate NPRESULT dNP_StartDataTransmission();
 
-    private delegate TrackIRClient.NPRESULT dNP_StopDataTransmission();
+    private delegate NPRESULT dNP_StopDataTransmission();
 
     public struct LPTRACKIRSIGNATUREDATA
     {

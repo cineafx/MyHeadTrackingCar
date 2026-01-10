@@ -2,6 +2,7 @@
 using HutongGames.PlayMaker;
 using JetBrains.Annotations;
 using MSCLoader;
+using MyHeadTrackingCar.TrackIRFromKerbTrack;
 using UnityEngine;
 
 namespace MyHeadTrackingCar;
@@ -77,7 +78,6 @@ public class MyHeadTrackingCarComponent : MonoBehaviour
     {
         _positionTransform = GameObject.Find("/PLAYER/Pivot/AnimPivot").transform;
 
-        //_yawTransform = GameObject.Find("/PLAYER/Pivot/AnimPivot").transform;
         Transform fpsCamera = GameObject.Find("/PLAYER/Pivot/AnimPivot/Camera/FPSCamera").transform;
         _mouseLookWithModifiers = fpsCamera.gameObject.AddComponent<MouseLookWithModifiers>();
 

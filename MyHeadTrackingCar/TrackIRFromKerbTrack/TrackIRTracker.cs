@@ -1,67 +1,68 @@
-﻿using TrackIRUnity;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using MSCLoader;
 using UnityEngine;
-using Microsoft.Win32;
 
+namespace MyHeadTrackingCar.TrackIRFromKerbTrack;
+
+/// <summary>
+/// Taken from <a href="https://github.com/FirstPersonKSP/KerbTrack/blob/c5850ffee11600cc54b305902175144ec0c5a820/KerbTrack/TrackIRTracker.cs" >FirstPersonKSP KerbTrack</a>
+/// under GPL-2.0 license.<br/>
+/// Removed missing TrackIR NPClient DLL registry NullRef workaround as the root cause was fixed,
+/// adjusted logger, adjusted namespace and implemented style / formatting changes. <br/>
+/// Functionality stays pretty much the same.
+/// </summary>
 public class TrackIRTracker
 {
-    TrackIRClient trackIRclient;
+    private readonly TrackIRClient _trackIRClient;
 
     public TrackIRTracker()
     {
-        Debug.Log("[KerbTrack] Initialising TrackIR...");
+        ModConsole.Log("[MyHeadTrackingCar] Initialising TrackIR...");
 
-        // TrackIRUnity's init throws a NullRef if the DLL location isn't found.
-        // Check this before starting.
-        bool keyFound = false;
-        RegistryKey registryKey = Registry.CurrentUser.OpenSubKey("Software\\NaturalPoint\\NATURALPOINT\\NPClient Location", false);
-        if (registryKey != null && registryKey.GetValue("Path") != null)
-            keyFound = true;
-        registryKey.Close();
+        _trackIRClient = new TrackIRClient();
+        List<string> statuses = _trackIRClient.TrackIR_Enhanced_Init();
 
-        string status;
-        if (keyFound)
-        {
-            trackIRclient = new TrackIRUnity.TrackIRClient();
-            if (trackIRclient == null)
-                status = "Failed to start.";
-            else
-                status = trackIRclient.TrackIR_Enhanced_Init();
-        }
-        else
-            status = "TrackIR not installed";
-
-        Debug.Log("[KerbTrack] TrackIR status: " + status);
+        ModConsole.Log(
+            "[MyHeadTrackingCar] TrackIR status: \n" +
+            string.Join(Environment.NewLine, statuses.Select(status => $"        {status}").ToArray()) +
+            "\n[MyHeadTrackingCar] End of TrackIR status"
+        );
     }
 
     public void GetData(ref Vector3 rot, ref Vector3 pos, ref ulong staleFrames)
     {
-        if (trackIRclient != null)
-        {
-			// https://docs.trackir.com/trackir-sdk/trackir-data
-			TrackIRClient.LPTRACKIRDATA data = trackIRclient.client_HandleTrackIRData();
+        if (_trackIRClient == null)
+            return;
 
-			const float kEncodedRangeMinMax = 16383.0f;
-			const float kDecodedTranslationMinMaxMeters = 0.5f; // +/- 50 cm
-            const float kDecodedRotationMinMaxDegrees = 180.0f;
+        // https://docs.trackir.com/trackir-sdk/trackir-data
+        TrackIRClient.LPTRACKIRDATA data = _trackIRClient.client_HandleTrackIRData();
 
-			// Negate right-hand rule rotations 
-			// to be consistent with left-handed coordinate basis.
-			rot.z = (-data.fNPRoll/ kEncodedRangeMinMax) * kDecodedRotationMinMaxDegrees;
-			rot.x = (-data.fNPPitch / kEncodedRangeMinMax) * kDecodedRotationMinMaxDegrees;
-			rot.y = (-data.fNPYaw / kEncodedRangeMinMax) * kDecodedRotationMinMaxDegrees;
+        const float kEncodedRangeMinMax = 16383.0f;
+        const float kDecodedTranslationMinMaxMeters = 0.5f; // +/- 50 cm
+        const float kDecodedRotationMinMaxDegrees = 180.0f;
 
-			pos.x = (-data.fNPX / kEncodedRangeMinMax) * kDecodedTranslationMinMaxMeters;
-			pos.y = (data.fNPY / kEncodedRangeMinMax) * kDecodedTranslationMinMaxMeters;
-			pos.z = (data.fNPZ / kEncodedRangeMinMax) * kDecodedTranslationMinMaxMeters;
-			
-			staleFrames = trackIRclient.NPStaleFrames;
-        }
-	}
+        // Negate right-hand rule rotations 
+        // to be consistent with left-handed coordinate basis.
+        rot.z = -data.fNPRoll / kEncodedRangeMinMax * kDecodedRotationMinMaxDegrees;
+        rot.x = -data.fNPPitch / kEncodedRangeMinMax * kDecodedRotationMinMaxDegrees;
+        rot.y = -data.fNPYaw / kEncodedRangeMinMax * kDecodedRotationMinMaxDegrees;
 
-    public void ResetOrientation() { }
+        pos.x = -data.fNPX / kEncodedRangeMinMax * kDecodedTranslationMinMaxMeters;
+        pos.y = data.fNPY / kEncodedRangeMinMax * kDecodedTranslationMinMaxMeters;
+        pos.z = data.fNPZ / kEncodedRangeMinMax * kDecodedTranslationMinMaxMeters;
+
+        staleFrames = _trackIRClient.NPStaleFrames;
+    }
+
+    public void ResetOrientation()
+    {
+    }
 
     public void Stop()
     {
-	    trackIRclient.TrackIR_Shutdown();
+        ModConsole.Log("[MyHeadTrackingCar] Shutting down TrackIR...");
+        _trackIRClient.TrackIR_Shutdown();
     }
 }
