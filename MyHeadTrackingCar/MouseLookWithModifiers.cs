@@ -14,7 +14,13 @@ public class MouseLookUpdatePatch
 {
     public static bool Prefix(ref MouseLook __instance)
     {
-        return __instance.axes != MouseLook.RotationAxes.MouseY;
+        // If the mod is not active and therefore MouseLookWithModifiers was never added,
+        // the original Update function needs to run.
+        // We only overwrite the MouseY version used for Tilt.
+        // The MouseX version is used for Yaw, which we do not interfere with.
+        // I don't like the static ModActive, but the alternative would be checking with every update
+        // whether a MouseLookWithModifiers is present in the same GameObject which hurts performance
+        return !MyHeadTrackingCarMod.ModActive || __instance.axes != MouseLook.RotationAxes.MouseY;
     }
 }
 
