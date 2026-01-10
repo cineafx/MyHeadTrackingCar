@@ -92,6 +92,6 @@
     </PropertyGroup>
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModsDir)" SkipUnchangedFiles="true"/>
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ModsDir)" SkipUnchangedFiles="true"/>
-    <Exec Command="&quot;$(ModsDir)\debug.bat&quot;"/>
+    <Exec Command="&quot;$(ModsDir)\debug.bat&quot;" WorkingDirectory="$(ModsDir)"/>
   </Target>
 </Project>
