@@ -82,6 +82,9 @@
     <Compile Include="MyHeadTrackingCarComponent.cs"/>
     <Compile Include="MyHeadTrackingCarMod.cs"/>
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Properties\Versions.props" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
   <Target Name="DeployUnityMod"
           AfterTargets="Build"
@@ -94,6 +97,23 @@
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ModsDir)" SkipUnchangedFiles="true"/>
     <Exec Command="&quot;$(ModsDir)\debug.bat&quot;" WorkingDirectory="$(ModsDir)"/>
   </Target>
+  <!-- 
+  Because AssemblyVersion stays at 1.0.0.0 there is no easy way to fetch the version for the release ZIP creation 
+  This is far from an optimal solution but it works well enough for this use case
+  -->
+  <UsingTask TaskName="GetFileVersion"
+             TaskFactory="CodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll" >
+    <ParameterGroup>
+      <AssemblyPath Required="true" />
+      <FileVersion Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[ FileVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(AssemblyPath).FileVersion; ]]>
+      </Code>
+    </Task>
+  </UsingTask>
   <Target Name="Publish"
           AfterTargets="Build"
           Condition=" '$(Configuration)' == 'Release' ">
@@ -103,12 +123,11 @@
     </ItemGroup>
     <Delete Files="@(ZipsToDelete)" ContinueOnError="true"/>
     <!-- Create name for new zip -->
-    <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">
-      <Output TaskParameter="Assemblies" ItemName="BuiltAssembly"/>
-    </GetAssemblyIdentity>
+    <GetFileVersion AssemblyPath="$(TargetPath)">
+      <Output TaskParameter="FileVersion" PropertyName="AssemblyFileVersion"/>
+    </GetFileVersion>
     <PropertyGroup>
-      <AssemblyVersion>%(BuiltAssembly.Version)</AssemblyVersion>
-      <ZipFileName>$(OutputPath)MyHeadTrackingCar-$(AssemblyVersion).zip</ZipFileName>
+      <ZipFileName>$(OutputPath)MyHeadTrackingCar-$(AssemblyFileVersion).zip</ZipFileName>
     </PropertyGroup>
     <!-- Build zip with powershell because Zip is not yet present in this version of MSBuilt-->
     <Exec Command="powershell -NoProfile -Command Compress-Archive -Path '$(TargetPath)','$(SolutionDir)README.md','$(SolutionDir)LICENSE' -DestinationPath '$(ZipFileName)' -Force"
