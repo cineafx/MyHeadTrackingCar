@@ -179,7 +179,7 @@ public class MyHeadTrackingCarComponent : MonoBehaviour
     private void DisableTrackingAndResetTransform()
     {
         _positionTransform.localPosition = Vector3.zero;
-        _mouseLookWithModifiers.transform.localEulerAngles = Vector3.zero;
+        _mouseLookWithModifiers.additionalRotation = Vector3.zero;
         _trackIrTracker?.Stop();
     }
 

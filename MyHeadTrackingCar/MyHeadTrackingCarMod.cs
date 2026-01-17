@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Harmony;
 using MSCLoader;
 using UnityEngine;
@@ -14,7 +15,7 @@ public class MyHeadTrackingCarMod : Mod
     public override string ID => "myheadtrackingcar";
     public override string Name => "My Head Tracking Car";
     public override string Author => "icdb / cineafx";
-    public override string Version => "0.2";
+    public override string Version => Assembly.GetExecutingAssembly().GetName().Version.ToString();
     public override string Description => "Adds the TrackIR SDK";
     //public override byte[] Icon => Properties.Resources.icon;
 
