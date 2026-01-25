@@ -1,6 +1,5 @@
 ﻿using System;
 using HutongGames.PlayMaker;
-using JetBrains.Annotations;
 using MSCLoader;
 using MyHeadTrackingCar.TrackIRFromKerbTrack;
 using UnityEngine;
@@ -9,30 +8,28 @@ namespace MyHeadTrackingCar;
 
 public class MyHeadTrackingCarComponent : MonoBehaviour
 {
-    public ushort applicationId = 20430; // Default = Unity 3d plugin
-
     #region Configurable properties
 
-    public MyHeadTrackingCarSettings Settings { get; set; }
+    public MyHeadTrackingCarSettings? Settings { get; set; }
 
-    private FsmString _currentVehicle;
+    private FsmString? _currentVehicle;
 
     #endregion
 
     #region fields and properties for unity transform updates
 
     [NonSerialized]
-    private Transform _positionTransform;
+    private Transform? _positionTransform;
 
     [NonSerialized]
-    private MouseLookWithModifiers _mouseLookWithModifiers;
+    private MouseLookWithModifiers? _mouseLookWithModifiers;
 
     private Vector3 LocalPosition
     {
         set
         {
-            if (_mouseLookWithModifiers.OriginalMouseLookEnabled)
-                _positionTransform.localPosition = value;
+            if (_mouseLookWithModifiers?.OriginalMouseLookEnabled ?? false)
+                _positionTransform?.localPosition = value;
         }
     }
 
@@ -40,6 +37,9 @@ public class MyHeadTrackingCarComponent : MonoBehaviour
     {
         set
         {
+            if (_mouseLookWithModifiers == null || Settings == null || _currentVehicle == null)
+                return;
+
             if (_mouseLookWithModifiers.OriginalMouseLookEnabled)
                 _mouseLookWithModifiers.additionalRotation = new Vector3(
                     Mathf.Clamp(value.x, -85.0f, 85.0f),
@@ -57,8 +57,7 @@ public class MyHeadTrackingCarComponent : MonoBehaviour
 
     #region private fields HeadTracking
 
-    [CanBeNull]
-    private TrackIRTracker _trackIrTracker;
+    private TrackIRTracker? _trackIrTracker;
 
     [NonSerialized]
     private float _timeSinceLastStaleFrameS;
@@ -76,6 +75,9 @@ public class MyHeadTrackingCarComponent : MonoBehaviour
 
     private void Awake()
     {
+        if (Settings == null)
+            ModConsole.LogError("ModSettings not referenced in Unity component.");
+
         _positionTransform = GameObject.Find("/PLAYER/Pivot/AnimPivot").transform;
 
         Transform fpsCamera = GameObject.Find("/PLAYER/Pivot/AnimPivot/Camera/FPSCamera").transform;
@@ -99,7 +101,7 @@ public class MyHeadTrackingCarComponent : MonoBehaviour
 
     private void Update()
     {
-        if (_trackIrTracker == null)
+        if (_trackIrTracker == null || Settings == null || _currentVehicle == null)
             return;
 
         bool shouldTrack = Settings.TrackingOutsideOfVehicles.GetValue() || _currentVehicle.Value.Length > 0;
@@ -144,7 +146,7 @@ public class MyHeadTrackingCarComponent : MonoBehaviour
 
     private void UpdatePose()
     {
-        if (_trackIrTracker == null)
+        if (_trackIrTracker == null || Settings == null)
             return;
 
         try
@@ -178,8 +180,8 @@ public class MyHeadTrackingCarComponent : MonoBehaviour
 
     private void DisableTrackingAndResetTransform()
     {
-        _positionTransform.localPosition = Vector3.zero;
-        _mouseLookWithModifiers.additionalRotation = Vector3.zero;
+        _positionTransform?.localPosition = Vector3.zero;
+        _mouseLookWithModifiers?.additionalRotation = Vector3.zero;
         _trackIrTracker?.Stop();
     }
 

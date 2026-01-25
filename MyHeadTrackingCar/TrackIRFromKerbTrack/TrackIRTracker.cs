@@ -33,9 +33,6 @@ public class TrackIRTracker
 
     public void GetData(ref Vector3 rot, ref Vector3 pos, ref ulong staleFrames)
     {
-        if (_trackIRClient == null)
-            return;
-
         // https://docs.trackir.com/trackir-sdk/trackir-data
         TrackIRClient.LPTRACKIRDATA data = _trackIRClient.client_HandleTrackIRData();
 

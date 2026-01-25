@@ -13,8 +13,8 @@ public class MyHeadTrackingCarMod : Mod
     /// Const define that is used for <see cref="Mod.Version"/> and AssemblyFileVersion.<br/>
     /// AssemblyFileVersion will automatically add an additional <c>.0</c> revision number when building.
     /// </summary>
-    public const string VersionConst = "0.2.2";
-    
+    public const string VersionConst = "0.2.3";
+
     #region Mod definition
 
     public override string ID => "myheadtrackingcar";
@@ -28,7 +28,7 @@ public class MyHeadTrackingCarMod : Mod
 
     #endregion
 
-    private readonly MyHeadTrackingCarSettings _modSettings = new();
+    private MyHeadTrackingCarSettings? MyHeadTrackingCarSettings { get; set; }
 
     /// <summary>
     /// Property which mirrors the ModLoader enable setting for this mod.
@@ -46,10 +46,15 @@ public class MyHeadTrackingCarMod : Mod
         HarmonyInstance harmonyInstance = HarmonyInstance.Create("com.cineafx.myheadtrackingcar.patch");
         harmonyInstance.PatchAll();
 
-        SetupFunction(Setup.ModSettings, _modSettings.SetupModSettings);
+        SetupFunction(Setup.ModSettings, OnModSettings);
         SetupFunction(Setup.OnLoad, OnLoad);
         SetupFunction(Setup.OnModEnabled, OnModEnabled);
         SetupFunction(Setup.OnModDisabled, OnModDisabled);
+    }
+
+    private void OnModSettings()
+    {
+        MyHeadTrackingCarSettings = new MyHeadTrackingCarSettings();
     }
 
     private void OnLoad()
@@ -62,7 +67,7 @@ public class MyHeadTrackingCarMod : Mod
         ModActive = true;
         if (_trackIrComponent != null)
             _trackIrComponent.enabled = true;
-        else
+        else if (ModLoader.CurrentScene == CurrentScene.Game)
             SetupHeadTracking();
     }
 
@@ -77,13 +82,30 @@ public class MyHeadTrackingCarMod : Mod
 
     #region HeadTracking setup
 
-    private MyHeadTrackingCarComponent _trackIrComponent;
+    private MyHeadTrackingCarComponent? _trackIrComponent;
 
     private void SetupHeadTracking()
     {
-        GameObject playerGameObj = GameObject.Find("/PLAYER");
+        GameObject? playerGameObj = GameObject.Find("/PLAYER");
+        if (playerGameObj == null)
+        {
+            // Most likely trying to set up head tracking while still in the main menu
+            ModConsole.Warning("Trying to setup head tracking while no PLAYER object exists.");
+            return;
+        }
+
+        // If head tracking is still active on the old game object this will reset everything.
+        // This should realistically never happen and is just a fallback.
+        _trackIrComponent?.enabled = false;
+
+        if (MyHeadTrackingCarSettings == null)
+        {
+            ModConsole.Error("Trying to setup head tracking before ModSettings SetupFunction ran.");
+            return;
+        }
+
         _trackIrComponent = playerGameObj.AddComponent<MyHeadTrackingCarComponent>();
-        _trackIrComponent.Settings = _modSettings;
+        _trackIrComponent.Settings = MyHeadTrackingCarSettings;
     }
 
     #endregion
